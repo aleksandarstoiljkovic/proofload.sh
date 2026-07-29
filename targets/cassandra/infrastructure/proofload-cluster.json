@@ -1,0 +1,7 @@
+{
+  "nodes": [
+    {"service": "cass1", "role": "node", "client_port": 9042},
+    {"service": "cass2", "role": "node", "client_port": 9042},
+    {"service": "cass3", "role": "node", "client_port": 9042}
+  ]
+}

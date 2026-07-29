@@ -1,0 +1,10 @@
+name: register
+mode: correctness
+key_space: 1000
+key_dist: uniform
+value_size: 16
+verify_model: register
+operations:
+  - {type: r, weight: 50}
+  - {type: w, weight: 50}
+params: {}

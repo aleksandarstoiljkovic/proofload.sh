@@ -1,0 +1,7 @@
+name: broken
+mode: nonsense
+key_space: 100
+key_dist: zipfian
+value_size: 10
+operations:
+  - {type: read, weight: 100}

@@ -1,0 +1,19 @@
+<clickhouse>
+    <!-- The clickhouse-server image ships a users.d/default-user.xml that pins the
+         default user to localhost only (::1, 127.0.0.1), which rejects the load
+         engine's network connections. replace="replace" overrides that networks
+         list so default is reachable from the compose network (and from the
+         initiating replica for ON CLUSTER DDL). Empty password = no auth; fine
+         for an ephemeral benchmark cluster. -->
+    <users>
+        <default>
+            <password></password>
+            <networks replace="replace">
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <access_management>1</access_management>
+        </default>
+    </users>
+</clickhouse>

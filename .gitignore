@@ -28,5 +28,16 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+.DS_Store
+
+# Project files
+warehouse/*
+results/*
+bin/*
+
+# AI tols
+.claude/
+.claude-flow/
+

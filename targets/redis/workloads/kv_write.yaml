@@ -1,0 +1,11 @@
+name: kv_write
+mode: performance
+key_space: 1000000
+key_dist: uniform
+value_size: 100
+verify_model: ""
+operations:
+  - {type: insert, weight: 70}
+  - {type: update, weight: 25}
+  - {type: read, weight: 5}
+params: {}

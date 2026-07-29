@@ -1,0 +1,80 @@
+# proofload Cassandra cluster: 3 nodes in a single datacenter, one ring,
+# replication factor 3 (set by the driver's Schema from
+# cluster.replication_factor in target.yaml). Every node is queryable.
+#
+# proofload runs this bundle via `--provision compose`; the compose provisioner
+# reads proofload-cluster.json to wire each container as a fault-controllable
+# node (node ID = container name). Killing one node leaves 2/3 up, so QUORUM
+# reads/writes still succeed and RF=3 keeps the data on the surviving peers; the
+# node rejoins the ring on `docker start`.
+#
+# Cassandra bootstrap is slow and MUST be staggered: only one node may join the
+# ring at a time, so cass2 waits for cass1 healthy and cass3 waits for cass2
+# healthy. A node is only "healthy" once CQL is actually serving (cqlsh probe),
+# which is well after the container starts, hence the long start_period.
+services:
+  cass1:
+    image: cassandra:5
+    container_name: cass-1
+    hostname: cass1
+    environment:
+      CASSANDRA_CLUSTER_NAME: proofload
+      CASSANDRA_SEEDS: cass1,cass2
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_RACK: rack1
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 100M
+    ports: ["19042:9042"]
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster' >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  cass2:
+    image: cassandra:5
+    container_name: cass-2
+    hostname: cass2
+    depends_on:
+      cass1:
+        condition: service_healthy
+    environment:
+      CASSANDRA_CLUSTER_NAME: proofload
+      CASSANDRA_SEEDS: cass1,cass2
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_RACK: rack1
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 100M
+    ports: ["19043:9042"]
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster' >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  cass3:
+    image: cassandra:5
+    container_name: cass-3
+    hostname: cass3
+    depends_on:
+      cass2:
+        condition: service_healthy
+    environment:
+      CASSANDRA_CLUSTER_NAME: proofload
+      CASSANDRA_SEEDS: cass1,cass2
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_RACK: rack1
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 100M
+    ports: ["19044:9042"]
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster' >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s

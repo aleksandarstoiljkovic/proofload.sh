@@ -1,0 +1,10 @@
+name: write_heavy
+mode: performance
+key_space: 200000
+key_dist: uniform
+value_size: 64
+verify_model: ""
+operations:
+  - {type: insert, weight: 70}
+  - {type: read, weight: 30}
+params: {}

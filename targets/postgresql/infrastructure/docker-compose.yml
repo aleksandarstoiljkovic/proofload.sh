@@ -1,0 +1,106 @@
+# proofload PostgreSQL cluster: 1 primary + 2 streaming-replication replicas on
+# the OFFICIAL, maintained postgres:16 image (physical/streaming replication set
+# up by us; no third-party wrapper image).
+#
+# proofload runs this bundle via `--provision compose`; the compose provisioner
+# reads proofload-cluster.json to wire each container as a fault-controllable
+# node. All three services expose a client endpoint (the primary serves reads
+# and writes; the replicas serve reads via hot_standby), so all three are
+# queryable. Killing a replica (pg-2/pg-3) leaves the primary and the surviving
+# replica serving; the killed replica restarts (heal runs `docker start`) and
+# re-streams from pg1 (its PGDATA is already cloned, so it skips base backup).
+# Killing the primary (pg-1) stops writes until it restarts and replicas
+# reconnect.
+#
+# proofload's pgdriver connects as superuser "postgres" / db "proofload" with
+# the password from PGPASSWORD/PROOFLOAD_PG_PASSWORD (= "proofload"), over TCP.
+# On the primary that password is POSTGRES_PASSWORD and the db is POSTGRES_DB.
+# Replication mechanics:
+#   - pg1 runs with `postgres -c wal_level=replica -c max_wal_senders=... ` and a
+#     one-shot initdb script (./config/primary-init.sh) that creates the `repl`
+#     replication role and appends pg_hba rules (host replication + host all).
+#   - pg2/pg3 run ./config/standby-entrypoint.sh which pg_basebackup -R clones
+#     pg1 into an empty PGDATA, then starts postgres with hot_standby=on.
+services:
+  pg1:
+    image: postgres:16
+    container_name: pg-1
+    hostname: pg1
+    environment:
+      POSTGRES_PASSWORD: proofload      # superuser "postgres" password (scram-sha-256)
+      POSTGRES_DB: proofload            # application database
+      REPL_USER: repl                   # consumed by primary-init.sh
+      REPL_PASSWORD: replpass
+    volumes:
+      # initdb hook: create repl role + append pg_hba rules (runs once on bootstrap).
+      - ./config/primary-init.sh:/docker-entrypoint-initdb.d/10-primary-init.sh:ro
+    # Replication GUCs as command flags (override postgresql.conf, keep image stock).
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - hot_standby=on
+      - -c
+      - wal_keep_size=256MB
+    ports: ["15432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d proofload"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+
+  pg2:
+    image: postgres:16
+    container_name: pg-2
+    hostname: pg2
+    depends_on:
+      pg1:
+        condition: service_healthy
+    environment:
+      PRIMARY_HOST: pg1
+      PRIMARY_PORT: "5432"
+      REPL_USER: repl
+      REPL_PASSWORD: replpass
+    volumes:
+      - ./config/standby-entrypoint.sh:/usr/local/bin/standby-entrypoint.sh:ro
+    # Custom command => image entrypoint execs it verbatim (no initdb): we clone
+    # the primary ourselves and come up as a hot standby.
+    command: ["bash", "/usr/local/bin/standby-entrypoint.sh"]
+    ports: ["15433:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d proofload"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+      start_period: 60s
+
+  pg3:
+    image: postgres:16
+    container_name: pg-3
+    hostname: pg3
+    depends_on:
+      pg1:
+        condition: service_healthy
+    environment:
+      PRIMARY_HOST: pg1
+      PRIMARY_PORT: "5432"
+      REPL_USER: repl
+      REPL_PASSWORD: replpass
+    volumes:
+      - ./config/standby-entrypoint.sh:/usr/local/bin/standby-entrypoint.sh:ro
+    command: ["bash", "/usr/local/bin/standby-entrypoint.sh"]
+    ports: ["15434:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d proofload"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+      start_period: 60s

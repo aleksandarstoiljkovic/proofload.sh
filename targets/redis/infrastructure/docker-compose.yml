@@ -1,0 +1,131 @@
+# proofload Redis cluster: 1 primary + 2 replicas (async replication) coordinated
+# by 3 Redis Sentinels (quorum 2/3).
+#
+# proofload runs this bundle via `--provision compose`; the compose provisioner
+# reads proofload-cluster.json to wire each container as a fault-controllable
+# node. redis1/redis2/redis3 are load endpoints (client_port 6379); the three
+# sentinels are coordination-only (no client_port) but remain fault-targetable.
+#
+# Auth is disabled and protected-mode is off for this ephemeral test cluster so
+# `redis-cli -h redis1 ping` works cross-container and proofload's redisdriver can
+# connect to the first endpoint with no password on DB 0. Config lives in ./config
+# and is mounted read-only.
+#
+# Killing redis2/redis3 (a replica): the primary and peer replica keep serving;
+# the killed node rejoins and re-syncs on restart (heal runs `docker start`).
+# Killing redis1 (the primary): Sentinel promotes a replica after ~5s, but the
+# driver targets a FIXED endpoint (redis1) and will not follow the failover, so
+# load against a killed primary surfaces errors until redis1 is healed. Prefer
+# killing a replica for the node-survival demo.
+services:
+  redis1:
+    image: redis:7
+    container_name: redis-1
+    hostname: redis1
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./config/redis-primary.conf:/usr/local/etc/redis/redis.conf:ro
+    ports: ["16379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  redis2:
+    image: redis:7
+    container_name: redis-2
+    hostname: redis2
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    depends_on:
+      redis1: {condition: service_healthy}
+    volumes:
+      - ./config/redis-replica.conf:/usr/local/etc/redis/redis.conf:ro
+    ports: ["16380:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  redis3:
+    image: redis:7
+    container_name: redis-3
+    hostname: redis3
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    depends_on:
+      redis1: {condition: service_healthy}
+    volumes:
+      - ./config/redis-replica.conf:/usr/local/etc/redis/redis.conf:ro
+    ports: ["16381:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  sentinel1:
+    image: redis:7
+    container_name: redis-sentinel-1
+    hostname: sentinel1
+    # Sentinel rewrites its config at runtime and refuses to start on a
+    # read-only file, so copy the mounted template to a writable path (/data)
+    # first. This keeps the checked-in template read-only and unmodified.
+    command: ["sh", "-c", "cp /etc/redis/sentinel.conf.tmpl /data/sentinel.conf && exec redis-sentinel /data/sentinel.conf"]
+    depends_on:
+      redis1: {condition: service_healthy}
+      redis2: {condition: service_healthy}
+      redis3: {condition: service_healthy}
+    volumes:
+      - ./config/sentinel.conf:/etc/redis/sentinel.conf.tmpl:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  sentinel2:
+    image: redis:7
+    container_name: redis-sentinel-2
+    hostname: sentinel2
+    # Sentinel rewrites its config at runtime and refuses to start on a
+    # read-only file, so copy the mounted template to a writable path (/data)
+    # first. This keeps the checked-in template read-only and unmodified.
+    command: ["sh", "-c", "cp /etc/redis/sentinel.conf.tmpl /data/sentinel.conf && exec redis-sentinel /data/sentinel.conf"]
+    depends_on:
+      redis1: {condition: service_healthy}
+      redis2: {condition: service_healthy}
+      redis3: {condition: service_healthy}
+    volumes:
+      - ./config/sentinel.conf:/etc/redis/sentinel.conf.tmpl:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  sentinel3:
+    image: redis:7
+    container_name: redis-sentinel-3
+    hostname: sentinel3
+    # Sentinel rewrites its config at runtime and refuses to start on a
+    # read-only file, so copy the mounted template to a writable path (/data)
+    # first. This keeps the checked-in template read-only and unmodified.
+    command: ["sh", "-c", "cp /etc/redis/sentinel.conf.tmpl /data/sentinel.conf && exec redis-sentinel /data/sentinel.conf"]
+    depends_on:
+      redis1: {condition: service_healthy}
+      redis2: {condition: service_healthy}
+      redis3: {condition: service_healthy}
+    volumes:
+      - ./config/sentinel.conf:/etc/redis/sentinel.conf.tmpl:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s

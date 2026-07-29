@@ -1,0 +1,11 @@
+name: produce_throughput
+mode: performance
+key_space: 1000000
+key_dist: uniform
+value_size: 512
+verify_model: ""
+operations:
+  - {type: produce, weight: 100}
+params:
+  topic: proofload
+  partitions: 12

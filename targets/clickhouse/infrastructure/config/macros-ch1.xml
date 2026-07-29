@@ -1,0 +1,7 @@
+<clickhouse>
+    <!-- Substituted into ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/...','{replica}') -->
+    <macros>
+        <shard>01</shard>
+        <replica>ch1</replica>
+    </macros>
+</clickhouse>

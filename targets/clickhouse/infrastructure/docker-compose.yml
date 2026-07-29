@@ -1,0 +1,69 @@
+# proofload ClickHouse cluster: 3 clickhouse-keeper (RAFT quorum) + 2 server
+# replicas of one shard (ReplicatedReplacingMergeTree, coordinated by Keeper).
+#
+# proofload runs this bundle via `--provision compose`; the compose provisioner
+# reads proofload-cluster.json to wire each container as a fault-controllable
+# node. Killing ch1 or ch2 keeps data available on the peer; killing one keeper
+# leaves a 2/3 RAFT quorum. Config lives in ./config and is mounted read-only.
+services:
+  keeper1:
+    image: clickhouse/clickhouse-keeper:24.8
+    container_name: clickhouse-keeper1
+    hostname: keeper1
+    volumes:
+      - ./config/keeper1.xml:/etc/clickhouse-keeper/keeper_config.xml:ro
+    ports: ["9181"]
+
+  keeper2:
+    image: clickhouse/clickhouse-keeper:24.8
+    container_name: clickhouse-keeper2
+    hostname: keeper2
+    volumes:
+      - ./config/keeper2.xml:/etc/clickhouse-keeper/keeper_config.xml:ro
+    ports: ["9181"]
+
+  keeper3:
+    image: clickhouse/clickhouse-keeper:24.8
+    container_name: clickhouse-keeper3
+    hostname: keeper3
+    volumes:
+      - ./config/keeper3.xml:/etc/clickhouse-keeper/keeper_config.xml:ro
+    ports: ["9181"]
+
+  ch1:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: clickhouse-ch1
+    hostname: ch1
+    depends_on: [keeper1, keeper2, keeper3]
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    volumes:
+      - ./config/server-common.xml:/etc/clickhouse-server/config.d/proofload.xml:ro
+      - ./config/users.xml:/etc/clickhouse-server/users.d/proofload-users.xml:ro
+      - ./config/macros-ch1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+    ports: ["19000:9000", "18123:8123"]
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  ch2:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: clickhouse-ch2
+    hostname: ch2
+    depends_on: [keeper1, keeper2, keeper3]
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    volumes:
+      - ./config/server-common.xml:/etc/clickhouse-server/config.d/proofload.xml:ro
+      - ./config/users.xml:/etc/clickhouse-server/users.d/proofload-users.xml:ro
+      - ./config/macros-ch2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
+    ports: ["19001:9000", "18124:8123"]
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s

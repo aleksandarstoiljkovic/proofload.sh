@@ -1,0 +1,7 @@
+{
+  "nodes": [
+    {"service": "pg1", "role": "primary", "client_port": 5432},
+    {"service": "pg2", "role": "replica", "client_port": 5432},
+    {"service": "pg3", "role": "replica", "client_port": 5432}
+  ]
+}

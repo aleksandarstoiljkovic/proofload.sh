@@ -1,0 +1,7 @@
+{
+  "nodes": [
+    {"service": "kafka1", "role": "broker", "client_port": 9094},
+    {"service": "kafka2", "role": "broker", "client_port": 9094},
+    {"service": "kafka3", "role": "broker", "client_port": 9094}
+  ]
+}

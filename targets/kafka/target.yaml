@@ -1,0 +1,15 @@
+target: kafka
+image: apache/kafka
+version: "3.9.2"
+defaults:
+  connections: 32
+  warmup: 30s
+  duration: 180s
+cluster:
+  backend: kubernetes
+  nodes: 3
+  replication_factor: 3
+  consistency: [acks=all, acks=1]
+capabilities:
+  verify_models: [kafka-log]
+  faults: [kill-node, network-partition, leader-election, isr-shrink]

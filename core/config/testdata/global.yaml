@@ -1,0 +1,3 @@
+connections: 16
+warmup: 10s
+duration: 30s

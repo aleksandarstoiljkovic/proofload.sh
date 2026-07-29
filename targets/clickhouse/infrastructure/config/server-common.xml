@@ -1,0 +1,23 @@
+<clickhouse>
+    <listen_host>0.0.0.0</listen_host>
+
+    <!-- Logical cluster "proofload": one shard, two replicas (ch1, ch2).
+         internal_replication=true so a Replicated* engine writes once and lets
+         replication (via Keeper) fan out, rather than the client writing both. -->
+    <remote_servers>
+        <proofload>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica><host>ch1</host><port>9000</port></replica>
+                <replica><host>ch2</host><port>9000</port></replica>
+            </shard>
+        </proofload>
+    </remote_servers>
+
+    <!-- ClickHouse Keeper ensemble used for ReplicatedMergeTree coordination. -->
+    <zookeeper>
+        <node><host>keeper1</host><port>9181</port></node>
+        <node><host>keeper2</host><port>9181</port></node>
+        <node><host>keeper3</host><port>9181</port></node>
+    </zookeeper>
+</clickhouse>

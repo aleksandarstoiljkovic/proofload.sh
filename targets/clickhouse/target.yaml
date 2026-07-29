@@ -1,0 +1,15 @@
+target: clickhouse
+image: clickhouse/clickhouse-server
+version: "24.8"
+defaults:
+  connections: 32
+  warmup: 5s
+  duration: 30s
+cluster:
+  backend: compose
+  nodes: 5
+  replication_factor: 2
+  consistency: [none, quorum]
+capabilities:
+  verify_models: [reconciliation]
+  faults: [kill-node, pause-node, network-partition]

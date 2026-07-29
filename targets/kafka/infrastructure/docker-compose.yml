@@ -1,0 +1,103 @@
+# proofload Kafka cluster: 3 brokers in KRaft mode on the OFFICIAL Apache image,
+# each a combined broker+controller forming the controller quorum (the
+# coordination analog to ClickHouse Keeper — no separate ZooKeeper/controller
+# tier).
+#
+# Image: apache/kafka:3.9.2 (the official Apache Software Foundation image).
+# Bitnami sunset their free Docker Hub catalog in 2025 (bitnami/kafka moved to
+# the unmaintained `bitnamilegacy` org); this bundle runs the upstream image
+# instead. The official image is configured purely by KAFKA_* environment
+# variables: its entrypoint (/etc/kafka/docker/{configure,launch}) strips the
+# KAFKA_ prefix and writes each var into server.properties, then auto-formats the
+# KRaft metadata log from CLUSTER_ID before launching. NOTE the env names differ
+# from Bitnami: it is KAFKA_NODE_ID / KAFKA_PROCESS_ROLES (no `CFG` infix) and
+# the runtime lives at /opt/kafka, not /opt/bitnami/kafka.
+#
+# proofload runs this bundle via `--provision compose`; the compose provisioner
+# reads proofload-cluster.json to wire each container as a fault-controllable
+# node. The proofload kafkadriver is a HOST client: it seeds off the first node
+# endpoint (127.0.0.1:19092) and then follows advertised listeners to the other
+# brokers, so every broker publishes an EXTERNAL listener advertised on
+# 127.0.0.1:1909x. In-container clients (and inter-broker traffic) use the
+# INTERNAL listener advertised as kafkaN:9092; the controller quorum talks over
+# the CONTROLLER listener on :9093.
+#
+# Three listeners per broker:
+#   CONTROLLER (:9093) — KRaft quorum, never advertised (controllers do not
+#                        advertise), security = PLAINTEXT.
+#   INTERNAL   (:9092) — inter-broker + in-container clients, advertised as
+#                        kafkaN:9092 (docker-network DNS = the compose service
+#                        name), and named as the inter-broker listener.
+#   EXTERNAL   (:9094) — host clients; advertised as 127.0.0.1:1909x and
+#                        published to that host port. This is the crux: a host
+#                        client bootstraps on 127.0.0.1:19092 (kafka1) and the
+#                        metadata it gets back advertises 127.0.0.1:19092/3/4, so
+#                        franz-go can follow the leader to any broker from the
+#                        host. Each broker MUST advertise its OWN host port here.
+#
+# Topics are created with replication factor 3 and min.insync.replicas=2, so
+# killing one broker (e.g. kafka-2) mid-produce keeps every partition available
+# on a surviving in-sync replica and acks=all writes continue.
+#
+# Verify the dual-listener advertising with:
+#   docker compose -f docker-compose.yml config
+# and confirm EXTERNAL advertises 127.0.0.1:19092/19093/19094 per broker.
+x-kafka-common: &kafka-common
+  image: apache/kafka:3.9.2
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 || exit 1"]
+    interval: 5s
+    timeout: 5s
+    retries: 30
+    start_period: 20s
+
+x-kafka-env: &kafka-env
+  KAFKA_PROCESS_ROLES: broker,controller
+  KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
+  KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+  # Cluster-wide durability: 3 replicas, tolerate one broker loss.
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "3"
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "3"
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "2"
+  KAFKA_DEFAULT_REPLICATION_FACTOR: "3"
+  KAFKA_MIN_INSYNC_REPLICAS: "2"
+  # Fixed KRaft cluster ID so all three nodes format the same metadata quorum
+  # (valid base64 UUID, from `kafka-storage.sh random-uuid`).
+  CLUSTER_ID: kKBojczYRF6Hgy2XJ_ZusQ
+
+services:
+  kafka1:
+    <<: *kafka-common
+    container_name: kafka-1
+    hostname: kafka1
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: "1"
+      KAFKA_LISTENERS: CONTROLLER://:9093,INTERNAL://:9092,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka1:9092,EXTERNAL://127.0.0.1:19092
+    ports: ["19092:9094"]
+
+  kafka2:
+    <<: *kafka-common
+    container_name: kafka-2
+    hostname: kafka2
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: "2"
+      KAFKA_LISTENERS: CONTROLLER://:9093,INTERNAL://:9092,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka2:9092,EXTERNAL://127.0.0.1:19093
+    ports: ["19093:9094"]
+
+  kafka3:
+    <<: *kafka-common
+    container_name: kafka-3
+    hostname: kafka3
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: "3"
+      KAFKA_LISTENERS: CONTROLLER://:9093,INTERNAL://:9092,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka3:9092,EXTERNAL://127.0.0.1:19094
+    ports: ["19094:9094"]

@@ -1,0 +1,13 @@
+name: produce_consume
+mode: performance
+key_space: 1000000
+key_dist: uniform
+value_size: 512
+verify_model: kafka-log
+operations:
+  - {type: produce, weight: 50}
+  - {type: consume, weight: 50}
+params:
+  topic: proofload
+  partitions: 12
+  group: proofload-consume

@@ -1,0 +1,10 @@
+name: kv_verify
+mode: performance
+key_space: 2000
+key_dist: uniform
+value_size: 32
+verify_model: ""
+operations:
+  - {type: insert, weight: 80}
+  - {type: read, weight: 20}
+params: {}

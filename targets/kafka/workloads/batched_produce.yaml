@@ -1,0 +1,28 @@
+name: batched_produce
+mode: performance
+key_space: 1000000
+key_dist: uniform
+value_size: 512
+verify_model: ""
+# Each Execute of a produce_batch op emits params.batch_size records in ONE
+# ProduceSync call (franz-go coalesces them into produce requests), so the broker
+# round-trip is amortised over the whole batch and throughput reflects Kafka's
+# real batched ingest (100k+ msg/s) rather than the ~11k msg/s of a synchronous
+# one-record-per-op produce.
+#
+# msgs/sec accounting: the runner counts each Execute as one op, so the reported
+#   throughput is in ops/s (batches per second). Multiply by batch_size for the
+#   record rate:   msgs/s = ops/s x batch_size.
+# The driver sets OpResult.Rows = batch_size, so the run summary's row/record
+# tally already counts individual messages, not batches.
+#
+# Determinism: record i of a batch is keyed op.Key*batch_size + i with seq op.Seq
+# (see batchRecordAt), so keys fan out without colliding and every derived key
+# still sees a contiguous per-key sequence — the kafka-log verifier holds if you
+# turn it on.
+operations:
+  - {type: produce_batch, weight: 100}
+params:
+  topic: proofload
+  partitions: 12
+  batch_size: 500

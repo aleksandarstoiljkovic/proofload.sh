@@ -1,0 +1,15 @@
+target: cassandra
+image: cassandra
+version: "5"
+defaults:
+  connections: 64
+  warmup: 60s
+  duration: 300s
+cluster:
+  backend: kubernetes
+  nodes: 3
+  replication_factor: 3
+  consistency: [quorum, one]
+capabilities:
+  verify_models: [reconciliation]
+  faults: [kill-node, pause-node, network-partition]

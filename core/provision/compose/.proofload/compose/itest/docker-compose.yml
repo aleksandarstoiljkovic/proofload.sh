@@ -1,0 +1,31 @@
+name: proofload-itest
+services:
+  itest-0:
+    image: redis
+    container_name: itest-0
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - itest-0-data:/data
+  itest-1:
+    image: redis
+    container_name: itest-1
+    ports:
+      - "16380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - itest-1-data:/data
+volumes:
+  itest-0-data:
+  itest-1-data:

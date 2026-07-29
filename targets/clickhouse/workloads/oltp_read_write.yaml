@@ -1,0 +1,11 @@
+name: oltp_read_write
+mode: performance
+key_space: 1000000
+key_dist: zipfian
+value_size: 100
+verify_model: ""
+operations:
+  - {type: read, weight: 80}
+  - {type: update, weight: 15}
+  - {type: insert, weight: 5}
+params: {}

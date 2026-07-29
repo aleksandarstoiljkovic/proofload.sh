@@ -1,0 +1,9 @@
+{
+  "nodes": [
+    {"service": "ch1", "role": "replica", "client_port": 9000},
+    {"service": "ch2", "role": "replica", "client_port": 9000},
+    {"service": "keeper1", "role": "seed"},
+    {"service": "keeper2", "role": "seed"},
+    {"service": "keeper3", "role": "seed"}
+  ]
+}

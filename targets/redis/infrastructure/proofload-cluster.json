@@ -1,0 +1,10 @@
+{
+  "nodes": [
+    {"service": "redis1", "role": "primary", "client_port": 6379},
+    {"service": "redis2", "role": "replica", "client_port": 6379},
+    {"service": "redis3", "role": "replica", "client_port": 6379},
+    {"service": "sentinel1", "role": "seed"},
+    {"service": "sentinel2", "role": "seed"},
+    {"service": "sentinel3", "role": "seed"}
+  ]
+}
